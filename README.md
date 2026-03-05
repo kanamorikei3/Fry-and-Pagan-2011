@@ -5,7 +5,7 @@
 ---
 
 <a name="japanese"></a>
-## 🇯🇵 日本語解説
+## 🇯🇵日本語での説明
 
 ### 1. 概要
 本プロジェクトでは、Fry and Pagan (2011) の手法を用い、符号制限（Sign Restrictions）を用いた構造ベクトル自己回帰（SVAR）モデルの特定と、その課題を解決する **Median Target (MT) method** をRで実装しました。
