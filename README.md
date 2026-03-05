@@ -21,7 +21,7 @@ $$z_t = A_1 z_{t-1} + \dots + A_6 z_{t-6} + e_t$$
 $$e_t = B \epsilon_t, \quad E[\epsilon_t \epsilon_t'] = I$$
 
 **記号の説明**
-* $z_t$: 内生変数のベクトル ($y\_gap, CPI\_infl, FEDFUNDS$)
+* $z_t$: 内生変数のベクトル ($y_{gap}, CPI_{infl}, FEDFUNDS$)
 * $A_p$: 誘導型モデルの係数行列 ($p=1, \dots, 6$)
 * $e_t$: 誘導型残差のベクトル ($e_t \sim N(0, \Omega)$)
 * $B$: 構造ショックが変数に与える同時点の影響を規定する識別行列
@@ -59,7 +59,7 @@ $$z_t = A_1 z_{t-1} + \dots + A_6 z_{t-6} + e_t$$
 $$e_t = B \epsilon_t, \quad E[\epsilon_t \epsilon_t'] = I$$
 
 **List of Symbols**
-* $z_t$: Vector of endogenous variables ($y\_gap, CPI\_infl, FEDFUNDS$).
+* $z_t$: Vector of endogenous variables ($y_{gap}, CPI_{infl}, FEDFUNDS$).
 * $A_p$: Coefficient matrices of the reduced-form model ($p=1, \dots, 6$).
 * $e_t$: Vector of reduced-form residuals ($e_t \sim N(0, \Omega)$).
 * $B$: Identification matrix representing the contemporaneous impact of structural shocks.
