@@ -61,7 +61,7 @@ $$e_t = B \epsilon_t, \quad E[\epsilon_t \epsilon_t'] = I$$
 **List of Symbols**
 * $z_t$: Vector of endogenous variables ($y_{gap}, CPI_{infl}, FEDFUNDS$).
 * $A_p$: Coefficient matrices of the reduced-form model ($p=1, \dots, 6$).
-* $e_t$: Vector of reduced-form residuals ($e_t \sim N(0, \Omega)$).
+* $e_t$: Vector of reduced-form residuals $e_t \sim N(0, \Omega)$.
 * $B$: Identification matrix representing the contemporaneous impact of structural shocks.
 * $\epsilon_t$: Vector of structural shocks (assumed to be mutually uncorrelated).
 * $I$: Identity matrix (implying structural shocks are orthogonal with unit variance).
