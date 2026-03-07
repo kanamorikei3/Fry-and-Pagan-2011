@@ -5,42 +5,43 @@
 ---
 
 <a name="japanese"></a>
-## 🇯🇵日本語での説明
+## 🇯🇵 日本語での説明
 
-### 1. 概要
-本プロジェクトでは、Fry and Pagan (2011) の手法を用い、符号制限（Sign Restrictions）を用いた構造ベクトル自己回帰（SVAR）モデルの特定と、その課題を解決する **Median Target (MT) method** をRで実装しました。
+### 1．概要
+本プロジェクトは，Fry and Pagan (2011) の手法に基づき，符号制約（Sign Restrictions）を用いた構造ベクトル自己回帰（SVAR）モデルをR言語で実装したものである．特に，従来の符号制約法が抱えていた論理的一貫性の欠如を解決する **Median Target (MT) 法** を採用し，実証分析の妥当性を高めている．
 
-### 2. 背景と目的
-SVARモデルにおいて、誘導型（Reduced-form）から構造ショックを一意に特定（Identification）することは困難です。
-従来の符号制約では、合格した全モデルのインパルス応答から、各時点ごとに中央値を抽出した「点別中央値」が使われてきましたが、Fry and Pagan (2011) はこれに対し、「合成されたIRFは単一の構造モデルを反映しておらず、ショックの直交性も保たれない」という論理的整合性の欠如を指摘しました。
-本リポジトリでは、実在する単一のモデルから中央値に最も近いものを選択するMT法を適用し、論理的一貫性のある分析を行っています。
+### 2．背景と目的：なぜ「MT法」が必要なのか
+経済学において，ある政策（利上げなど）が景気に与える影響を分析する際，SVARモデルが広く用いられる．しかし，データから得られる「誘導型残差」は互いに相関しており，そのままでは純粋な「政策ショック」として分離できない．
 
-### 3. モデルとデータ
+* **符号制約法とは**：
+    「利上げをすればインフレ率は下がるはずだ」という理論的な「符号（プラス・マイナス）」を条件として課し，条件に合致するモデルを数千回のシミュレーションから抽出する手法である．
+* **"the median of the impulse responses" の問題点**：
+    従来は，合格した全モデルのインパルス応答の「時点別中央値（median of the impulse responses）」をつなぎ合わせてグラフを作成していた．しかし，Fry and Pagan (2011) は，「各時点の中央値を集めて作ったグラフは，実在するどのモデルとも一致せず，統計的な整合性が保たれない（ショックの直交性が失われる）」と指摘した．
+* **MT法の解決策**：
+    合格したモデル群の中から，計算された中央値に最も近い「実在する単一のモデル」を一つだけ選出する．これにより，論理的に矛盾のないインパルス応答分析が可能となる．
+
+### 3．モデルとデータ
 #### 3.1 モデル定式化
 $$z_t = A_1 z_{t-1} + \dots + A_6 z_{t-6} + e_t$$
 $$e_t = B \epsilon_t, \quad E[\epsilon_t \epsilon_t'] = I$$
 
 **記号の説明**
-* $z_t$: 内生変数のベクトル ($y_{gap}, CPI_{infl}, FEDFUNDS$)
-* $A_p$: 誘導型モデルの係数行列 ($p=1, \dots, 6$)
-* $e_t$: 誘導型残差のベクトル。 $e_t \sim N(0, \Omega)$ と仮定。
-* $B$: 構造ショックが変数に与える同時点の影響を規定する識別行列
-* $\epsilon_t$: 構造ショックのベクトル（各ショックは互いに無相関と仮定）
-* $I$: 単位行列（構造ショックの分散が1で直交していることを示す）
+* $z_t$：内生変数のベクトル（$y_{gap}$: 産出量ギャップ，$CPI_{infl}$: インフレ率，$FEDFUNDS$: 政策金利）．
+* $A_p$：誘導型モデルの係数行列．本再現では最新データに適合させるため，AICに基づき $p=6$ を採用している．
+* $e_t$：観測可能な「誤差」のベクトル． $e_t \sim N(0, \Omega)$ と仮定する．
+* $B$：構造ショックが各変数に与える「初動」を規定する識別行列．
+* $\epsilon_t$：互いに独立な「構造ショック」のベクトル（例：金融政策ショック）．
 
-#### 3.2 データソース (FRED)
-* **Real GDP (GDPC1)**: [FRED Link](https://fred.stlouisfed.org/series/GDPC1) (産出量ギャップ算出に使用)
-* **CPI (CPIAUCSL)**: [FRED Link](https://fred.stlouisfed.org/series/CPIAUCSL) (インフレ率算出に使用)
-* **Federal Funds Rate (FEDFUNDS)**: [FRED Link](https://fred.stlouisfed.org/series/FEDFUNDS)
+#### 3.2 データの前処理
+* **年率換算（Annualization）**：
+    インフレ率は四半期対数差分を 400 倍し，政策金利と同じ「年率（％）」のスケールに統一した．これにより推定の安定性と解釈の容易性を確保している．
+* **フィルタリング**：
+    GDPからトレンドを除去し，景気循環成分（産出量ギャップ）を抽出するために HPフィルター（$\lambda=1600$）を適用した．
 
-### 4. 分析結果
-推定された特性根（Roots）はすべて1未満であり、系は安定しています。インパルス応答関数（IRF）は、金融引き締めショックが景気と物価を抑制するという理論通りの結果を示しました。
+### 4．分析結果
+シミュレーションの結果，5,000回の試行のうち 498 個のモデルが符号制約をパスした．MT法によって選出された代表モデルのインパルス応答（下図）は，金融引き締めショック（MPショック）によって産出量とインフレ率がなめらかに抑制される様子を示しており，マクロ経済理論と整合的である．
 
 ![Impulse Response Function](output/irf_mp_shock_mt.png)
-
-### 5. 拡張性と展望
-* **多変数化**: 為替レートや原油価格を追加したモデルへの拡張。
-* **複数ショックの識別**: 供給ショック（AS）と需要ショック（AD）の同時特定。
 
 ---
 
@@ -48,32 +49,27 @@ $$e_t = B \epsilon_t, \quad E[\epsilon_t \epsilon_t'] = I$$
 ## 🇺🇸 English Description
 
 ### 1. Overview
-This project implements the **Median Target (MT) method** in R to address identification issues in Structural VAR (SVAR) models using sign restrictions, following the methodology of Fry and Pagan (2011).
+This project provides a robust R implementation of the **Median Target (MT) method** for Structural VAR (SVAR) models, as proposed by Fry and Pagan (2011). It identifies structural shocks using sign restrictions while ensuring the logical consistency of the resulting impulse response functions (IRFs).
 
-### 2. Objectives
-Fry and Pagan (2011) criticized the traditional "the median of the impulse responses" IRF because it does not correspond to any single structural model and fails to ensure the orthogonality of shocks. This implementation uses the MT method to select the single best-fitting model from the set of accepted candidates, ensuring logical and statistical consistency.
+### 2. Theoretical Motivation: Why MT Method?
+In the context of SVAR identification via sign restrictions, researchers often report the **"median of the impulse responses"** across all accepted models. Fry and Pagan (2011) demonstrated that such a median response:
+1. Does not correspond to any single underlying structural model.
+2. Fails to satisfy the orthogonality condition of structural shocks.
 
-### 3. Specification & Data
-#### 3.1 Model Specification
-$$z_t = A_1 z_{t-1} + \dots + A_6 z_{t-6} + e_t$$
-$$e_t = B \epsilon_t, \quad E[\epsilon_t \epsilon_t'] = I$$
+The **MT Method** addresses these issues by selecting the single "best" model from the set of accepted candidates—specifically, the one closest to the calculated medians across all horizons.
 
-**List of Symbols**
-* $z_t$: Vector of endogenous variables ($y_{gap}, CPI_{infl}, FEDFUNDS$).
-* $A_p$: Coefficient matrices of the reduced-form model ($p=1, \dots, 6$).
-* $e_t$: Vector of reduced-form residuals $e_t \sim N(0, \Omega)$.
-* $B$: Identification matrix representing the contemporaneous impact of structural shocks.
-* $\epsilon_t$: Vector of structural shocks (assumed to be mutually uncorrelated).
-* $I$: Identity matrix (implying structural shocks are orthogonal with unit variance).
+### 3. Model and Data
+#### 3.1 Specification
+We estimate a 3-variable VAR with $p=6$ lags, selected via AIC to capture long-term dynamics in the extended FRED dataset.
 
-#### 3.2 Data Sources (FRED)
-* **Real GDP**: Output gap derived from [GDPC1](https://fred.stlouisfed.org/series/GDPC1).
-* **CPI**: Inflation rate derived from [CPIAUCSL](https://fred.stlouisfed.org/series/CPIAUCSL).
-* **Federal Funds Rate**: Monetary policy instrument ([FEDFUNDS](https://fred.stlouisfed.org/series/FEDFUNDS)).
+* **Endogenous Variables ($z_t$)**: Output Gap ($y_{gap}$), Annualized Inflation ($CPI_{infl}$), and Federal Funds Rate ($FEDFUNDS$).
+* **Annualization**: Inflation is calculated as 400 times the log-difference of the CPI to match the annualized scale of the interest rate.
 
-### 4. Key Findings
-The characteristic roots (Max: 0.918) indicate that the VAR system is stable. The IRFs demonstrate that a contractionary monetary policy shock leads to a temporary decline in both output and inflation.
+#### 3.2 Identification Strategy
+We identify a **Monetary Policy (MP) Shock** using the following sign restrictions on the impact matrix $B$:
+* **FEDFUNDS**: $+$ (Rise in interest rates)
+* **Output Gap**: $-$ (Decline in economic activity)
+* **Inflation**: $-$ (Decline in price levels)
 
-### 5. Future Extensions
-* **Larger Systems**: Incorporating exchange rates or commodity prices.
-* **Multiple Shocks**: Simultaneous identification of Aggregate Supply and Demand shocks.
+### 4. Key Results
+The system satisfies stability conditions (all roots $< 1$). The selected MT model generates smooth and economically intuitive IRFs, where a contractionary MP shock leads to a persistent decrease in both output and inflation over 20 quarters.
