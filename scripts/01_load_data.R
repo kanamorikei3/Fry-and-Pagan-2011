@@ -1,61 +1,70 @@
 # ==========================================================
-# Script: 01_Data_Cleaning.R
+# Script: 01_load_data.R
 # Project: Replication of Sign Restrictions in SVAR (Fry and Pagan, 2011)
-# Description: Data loading, cleaning, and preprocessing for SVAR analysis.
-#              This includes HP-filtering for the Output Gap and 
-#              calculating inflation rates.
+# Description: Advanced data processing using tidyverse and zoo.
+#              Includes frequency conversion, annualization, and detrending.
 # ==========================================================
 
-# 1. Load Libraries
-library(mFilter)  # For HP filter
-library(vars)     # For VAR model utilities
-library(readr)    # For robust CSV reading
+# 1. Load Required Libraries
+library(mFilter)   # For HP filter
+library(tidyverse) # For modern data manipulation
+library(zoo)       # For yearqtr frequency handling
 
-# 2. Load Raw Data
-# Data sourced from FRED (Federal Reserve Economic Data)
-# Required files: GDPC1.csv, CPIAUCSL.csv, FEDFUNDS.csv
-gdp_raw  <- read_csv("data/GDPC1.csv", show_col_types = FALSE)
-cpi_raw  <- read_csv("data/CPIAUCSL.csv", show_col_types = FALSE)
-fed_raw  <- read_csv("data/FEDFUNDS.csv", show_col_types = FALSE)
+# 2. Data Ingestion with Schema Enforcement
+# Suppressing messages and ensuring correct naming at the start
+load_fred_data <- function(file_name, new_col_name) {
+  read_csv(paste0("data/", file_name), show_col_types = FALSE) %>%
+    rename(DATE = 1, !!new_col_name := 2)
+}
 
-# 3. Data Integration and Transformation
-# Standardize column names for merging
-colnames(gdp_raw) <- c("DATE", "GDPC1")
-colnames(cpi_raw) <- c("DATE", "CPI")
-colnames(fed_raw) <- c("DATE", "FEDFUNDS")
+gdp_raw <- load_fred_data("GDPC1.csv", "GDPC1")
+cpi_raw <- load_fred_data("CPIAUCSL.csv", "CPI")
+fed_raw <- load_fred_data("FEDFUNDS.csv", "FEDFUNDS")
 
-# Merge datasets by DATE (Common frequency: Quarterly)
-# Note: Ensure all series are converted to the same frequency if necessary.
-combined_data <- merge(merge(gdp_raw, cpi_raw, by = "DATE"), fed_raw, by = "DATE")
+# 3. Frequency Conversion (Monthly Average to Quarterly)
+# Monthly CPI and FEDFUNDS are averaged over each quarter.
+# GDP is usually already quarterly, but as.yearqtr() ensures synchronization.
+cpi_q <- cpi_raw %>%
+  mutate(QTR = as.yearqtr(DATE)) %>%
+  group_by(QTR) %>%
+  summarise(CPI = mean(CPI, na.rm = TRUE), .groups = "drop")
 
-# Calculate Inflation Rate (Quarter-on-Quarter Log-Difference, Percentage)
-# Formula: pi_t = [log(CPI_t) - log(CPI_{t-1})] * 100
-combined_data$CPI_infl <- c(NA, diff(log(combined_data$CPI))) * 100
+fed_q <- fed_raw %>%
+  mutate(QTR = as.yearqtr(DATE)) %>%
+  group_by(QTR) %>%
+  summarise(FEDFUNDS = mean(FEDFUNDS, na.rm = TRUE), .groups = "drop")
 
-# 4. Detrending (HP Filter)
-# Extract the cyclical component (Output Gap) from Log Real GDP.
-# lambda = 1600 is the standard setting for quarterly data.
-gdp_log <- log(combined_data$GDPC1)
-gdp_hp  <- hpfilter(gdp_log, freq = 1600)
+gdp_q <- gdp_raw %>%
+  mutate(QTR = as.yearqtr(DATE))
 
-# Extract the cycle component as Output Gap
-combined_data$y_gap <- as.numeric(gdp_hp$cycle)
+# Inner join to ensure balanced sample across all variables
+combined_data <- gdp_q %>%
+  inner_join(cpi_q, by = "QTR") %>%
+  inner_join(fed_q, by = "QTR") %>%
+  arrange(QTR)
 
-# 5. Final Dataset Preparation
-# Variables: Output Gap (y_gap), Inflation (CPI_infl), Interest Rate (FEDFUNDS)
-# Removing the first row (NA due to diff) to ensure a balanced sample.
-final_data <- na.omit(combined_data[, c("DATE", "y_gap", "CPI_infl", "FEDFUNDS")])
+# 4. Variable Transformation
+# Inflation is calculated as annualized log-difference: (log(P_t) - log(P_{t-1})) * 400
+# GDP gap is extracted using the cyclical component of the HP filter (lambda=1600)
+combined_data <- combined_data %>%
+  mutate(
+    CPI_infl = (log(CPI) - log(lag(CPI))) * 400,
+    gdp_log  = log(GDPC1)
+  ) %>%
+  drop_na()
 
-# 6. Mean Correction (Demeaning)
-# As per Fry and Pagan (2011), variables are centered before estimation.
-# We remove the first column (DATE) for calculation.
-final_data_centered <- scale(as.matrix(final_data[, -1]), scale = FALSE)
+# HP Filter Application
+hp_res <- hpfilter(combined_data$gdp_log, freq = 1600)
+combined_data$y_gap <- as.numeric(hp_res$cycle)
 
-# Convert back to data frame for easier handling in subsequent scripts
-final_data_final <- as.data.frame(final_data_centered)
+# 5. Final Scaling (Demeaning)
+# Applying Mean Correction (scale=FALSE) for the VAR estimation.
+final_data <- combined_data %>%
+  select(y_gap, CPI_infl, FEDFUNDS) %>%
+  mutate(across(everything(), ~ as.numeric(scale(., scale = FALSE))))
 
-# 7. Export Processed Data
+# 6. Export and Logging
 if (!dir.exists("data")) dir.create("data")
-write.csv(final_data_final, "data/processed_data.csv", row.names = FALSE)
+write_csv(final_data, "data/processed_data.csv")
 
-message("Pre-processing complete. Processed data saved to 'data/processed_data.csv'.")
+message("Data processing complete. The final dataset has ", nrow(final_data), " observations.")
